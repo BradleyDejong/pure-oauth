@@ -1,44 +1,83 @@
 /* eslint-env jest */
 
-test('placeholder', () => {
+import {task} from 'folktale/concurrency/task'
+import {set, lensProp, compose} from 'ramda'
+
+jest.mock('./location')
+jest.mock('./random')
+
+jest.unmock('./session-store')
+const store = require('./session-store')
+store.set = jest.fn((a, b, c) => {
+  return task(resolver => resolver.resolve())
 })
 
-/*
-describe('standalone launch', () => {
+/* eslint-disable */
+import { authorize } from './authorize'
+/* eslint-enable */
 
-  it('creates and stores state at beginning of launch flow', done => {
-    sandbox.stub(SessionStorage, 'setState');
+const MOCK_APP = 'fake-app'
 
-    sandbox.stub(StateGenerator, 'generate');
-    StateGenerator.generate.returns('example-state');
+const deleteClientId = set(lensProp('client_id'), '')
+const deleteRedirectUri = set(lensProp('redirect_uri'), '')
+const deleteResponseType = set(lensProp('response_type'), '')
+const deleteState = set(lensProp('state'), '')
 
-    StandaloneLaunch.run(FHIR_APP_CONFIG)
-      .then(() => {
-        assert(SessionStorage.setState.calledWith('example-state'), 'setState not called with \'example-state\'');
-        done();
-      })
-      .catch(err => done(new Error(err)));
-  });
+const clientId = set(lensProp('client_id'), 'client-id')
+const redirectUri = set(lensProp('redirect_uri'), 'redirect-uri')
+const responseType = set(lensProp('response_type'), 'code')
+const addState = set(lensProp('state'), 'mock-state')
 
-  it('redirects to authorize_uri when no state is present', done => {
-    sandbox.stub(OauthUris, 'getOauthEndpoints')
-      .returns(q.when(new SmartOauthEndpoints(MOCK_URIS)));
+const VALID_PARAMS = compose(clientId, redirectUri, responseType, addState)({})
 
-    const expectedUriRegex = new RegExp(`^${MOCK_URIS.authorize}\?.*$`);
-    sandbox.stub(StateGenerator, 'generate');
-    StateGenerator.generate.returns('example-state');
-    sandbox.stub(SessionStorage, 'setState');
+describe('authorize', () => {
+  test('creates and stores state at beginning of launch flow', async () => {
+    const MOCKED_STATE = 5
+    require('./random').__setFakeRandom(MOCKED_STATE)
 
-    StandaloneLaunch.run(FHIR_APP_CONFIG)
-      .then(() => {
-        const uriCalled = location.setCurrentLocation.getCall(0).args[0];
-        assert(expectedUriRegex.test(uriCalled));
-        done();
-      })
-      .catch(err => {
-        done(new Error(err));
-      });
+    await authorize(MOCK_APP, 'test123', VALID_PARAMS).run().promise()
 
-  });
-});
-*/
+    expect(store.set.mock.calls[0]).toEqual([MOCK_APP, 'state', MOCKED_STATE])
+  })
+
+  test('requires client_id', async (done) => {
+    try {
+      await authorize(MOCK_APP, 'mock-auth-url', deleteClientId(VALID_PARAMS)).run().promise()
+    } catch (e) {
+      expect(e).toBe('client_id is required')
+      done()
+    }
+  })
+
+  test('requires redirect_uri', async (done) => {
+    try {
+      await authorize(MOCK_APP, 'mock-auth-url', deleteRedirectUri(VALID_PARAMS)).run().promise()
+    } catch (e) {
+      expect(e).toBe('redirect_uri is required')
+      done()
+    }
+  })
+
+  test('requires response_type===code', async (done) => {
+    try {
+      await authorize(MOCK_APP, 'mock-auth-url', deleteResponseType(VALID_PARAMS)).run().promise()
+    } catch (e) {
+      expect(e).toBe('response_type is required')
+      done()
+    }
+  })
+
+  test('requires state', async (done) => {
+    try {
+      await authorize(MOCK_APP, 'mock-auth-url', deleteState(VALID_PARAMS)).run().promise()
+    } catch (e) {
+      expect(e).toBe('state is required')
+      done()
+    }
+  })
+
+  test('redirects to authorize_uri', async () => {
+    await authorize(MOCK_APP, 'mock-auth-url', VALID_PARAMS).run().promise()
+    expect(require('./location').__current()).toBe('mock-auth-url')
+  })
+})
