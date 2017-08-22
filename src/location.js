@@ -6,4 +6,8 @@ const redirect = url => {
   })
 }
 
-export { redirect }
+const currentLocation = task(resolver => {
+  resolver.resolve(window.location.href)
+})
+
+export { redirect, currentLocation }
