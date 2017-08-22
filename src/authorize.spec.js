@@ -1,21 +1,19 @@
 /* eslint-env jest */
 
 import {task} from 'folktale/concurrency/task'
-import {set, lensProp, compose} from 'ramda'
+import {set, lensProp, compose, flip} from 'ramda'
 import url from 'url'
 
 jest.mock('./location')
 jest.mock('./random')
 
-jest.unmock('./session-store')
+const random = require('./random')
 const store = require('./session-store')
 store.set = jest.fn((a, b, c) => {
-  return task(resolver => resolver.resolve())
+  return task(resolver => resolver.resolve(c))
 })
 
-/* eslint-disable */
-import { authorize } from './authorize'
-/* eslint-enable */
+const { authorize } = require('./authorize')
 
 const lenses = {
   client_id: lensProp('client_id'),
@@ -24,31 +22,38 @@ const lenses = {
   state: lensProp('state')
 }
 
-const deleteClientId = set(lenses.client_id, '')
-const deleteRedirectUri = set(lenses.redirect_uri, '')
-const deleteResponseType = set(lenses.response_type, '')
-const deleteState = set(lenses.state, '')
+const del = flip(set)('')
 
-const clientId = set(lenses.client_id, 'fake-client-id')
-const redirectUri = set(lenses.redirect_uri, 'redirect uri')
-const responseType = set(lenses.response_type, 'code')
-const addState = set(lenses.state, 'mock state')
-
-const VALID_PARAMS = compose(clientId, redirectUri, responseType, addState)({})
+const VALID_PARAMS = compose(
+  set(lenses.client_id, 'fake-client-id')
+  , set(lenses.redirect_uri, 'redirect uri')
+  , set(lenses.response_type, 'code')
+  , set(lenses.state, 'mock state')
+)({})
 
 describe('authorize', () => {
   test('creates and stores state at beginning of launch flow', async () => {
     const MOCKED_STATE = 5
-    require('./random').__setFakeRandom(MOCKED_STATE)
+    random.__setFakeRandom(MOCKED_STATE)
 
     await authorize('test123', VALID_PARAMS).run().promise()
 
     expect(store.set.mock.calls[0]).toEqual(['fake-client-id', 'state', MOCKED_STATE])
   })
 
+  test('passes state to authorize call', async () => {
+    const MOCKED_STATE = 5
+    random.__setFakeRandom(MOCKED_STATE)
+
+    await authorize('test123', VALID_PARAMS).run().promise()
+
+    const queryParams = url.parse(require('./location').__current(), true).query
+    expect(queryParams.state).toEqual('5')
+  })
+
   test('requires client_id', async (done) => {
     try {
-      await authorize('mock-auth-url', deleteClientId(VALID_PARAMS)).run().promise()
+      await authorize('mock-auth-url', del(lenses.client_id)(VALID_PARAMS)).run().promise()
     } catch (e) {
       expect(e).toBe('client_id is required')
       done()
@@ -57,7 +62,7 @@ describe('authorize', () => {
 
   test('requires redirect_uri', async (done) => {
     try {
-      await authorize('mock-auth-url', deleteRedirectUri(VALID_PARAMS)).run().promise()
+      await authorize('mock-auth-url', del(lenses.redirect_uri)(VALID_PARAMS)).run().promise()
     } catch (e) {
       expect(e).toBe('redirect_uri is required')
       done()
@@ -75,7 +80,7 @@ describe('authorize', () => {
 
   test('requires response_type', async (done) => {
     try {
-      await authorize('mock-auth-url', deleteResponseType(VALID_PARAMS)).run().promise()
+      await authorize('mock-auth-url', del(lenses.response_type)(VALID_PARAMS)).run().promise()
     } catch (e) {
       expect(e).toBe('response_type is required')
       done()
@@ -84,7 +89,7 @@ describe('authorize', () => {
 
   test('requires state', async (done) => {
     try {
-      await authorize('mock-auth-url', deleteState(VALID_PARAMS)).run().promise()
+      await authorize('mock-auth-url', del(lenses.state)(VALID_PARAMS)).run().promise()
     } catch (e) {
       expect(e).toBe('state is required')
       done()
@@ -97,9 +102,11 @@ describe('authorize', () => {
   })
 
   test('includes parameters', async () => {
+    random.__setFakeRandom(10)
+
     await authorize('mock-auth-url', VALID_PARAMS).run().promise()
 
     const queryParams = url.parse(require('./location').__current(), true).query
-    expect(queryParams).toEqual(VALID_PARAMS)
+    expect(queryParams).toEqual(set(lenses.state, '10', VALID_PARAMS))
   })
 })
