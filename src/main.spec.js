@@ -2,6 +2,7 @@
 
 import {task} from 'folktale/concurrency/task'
 import {set, lensProp, compose} from 'ramda'
+import url from 'url'
 
 jest.mock('./location')
 jest.mock('./random')
@@ -18,15 +19,22 @@ import { authorize } from './authorize'
 
 const MOCK_APP = 'fake-app'
 
-const deleteClientId = set(lensProp('client_id'), '')
-const deleteRedirectUri = set(lensProp('redirect_uri'), '')
-const deleteResponseType = set(lensProp('response_type'), '')
-const deleteState = set(lensProp('state'), '')
+const lenses = {
+  client_id: lensProp('client_id'),
+  redirect_uri: lensProp('redirect_uri'),
+  response_type: lensProp('response_type'),
+  state: lensProp('state')
+}
 
-const clientId = set(lensProp('client_id'), 'client-id')
-const redirectUri = set(lensProp('redirect_uri'), 'redirect-uri')
-const responseType = set(lensProp('response_type'), 'code')
-const addState = set(lensProp('state'), 'mock-state')
+const deleteClientId = set(lenses.client_id, '')
+const deleteRedirectUri = set(lenses.redirect_uri, '')
+const deleteResponseType = set(lenses.response_type, '')
+const deleteState = set(lenses.state, '')
+
+const clientId = set(lenses.client_id, 'client id')
+const redirectUri = set(lenses.redirect_uri, 'redirect uri')
+const responseType = set(lenses.response_type, 'code')
+const addState = set(lenses.state, 'mock state')
 
 const VALID_PARAMS = compose(clientId, redirectUri, responseType, addState)({})
 
@@ -60,6 +68,15 @@ describe('authorize', () => {
 
   test('requires response_type===code', async (done) => {
     try {
+      await authorize(MOCK_APP, 'mock-auth-url', set(lenses.response_type, 'not-code', VALID_PARAMS)).run().promise()
+    } catch (e) {
+      expect(e).toBe('response_type must be one of [\'code\', \'token\']')
+      done()
+    }
+  })
+
+  test('requires response_type', async (done) => {
+    try {
       await authorize(MOCK_APP, 'mock-auth-url', deleteResponseType(VALID_PARAMS)).run().promise()
     } catch (e) {
       expect(e).toBe('response_type is required')
@@ -77,7 +94,14 @@ describe('authorize', () => {
   })
 
   test('redirects to authorize_uri', async () => {
+    await authorize(MOCK_APP, 'http://mock-auth-url', VALID_PARAMS).run().promise()
+    expect(require('./location').__current()).toMatch(/mock-auth-url/)
+  })
+
+  test('includes parameters', async () => {
     await authorize(MOCK_APP, 'mock-auth-url', VALID_PARAMS).run().promise()
-    expect(require('./location').__current()).toBe('mock-auth-url')
+
+    const queryParams = url.parse(require('./location').__current(), true).query
+    expect(queryParams).toEqual(VALID_PARAMS)
   })
 })

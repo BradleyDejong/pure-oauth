@@ -1,30 +1,29 @@
-import Task from 'folktale/concurrency/task'
-import Result from 'folktale/result'
-import {curry} from 'ramda'
+import {reduce, concat, curry} from 'ramda'
+import queryString from 'query-string'
 
 import {set} from './session-store'
 import {random} from './random'
 import {redirect} from './location'
+import {required, oneOf, validate} from './util/validate'
+import {resultToTask} from './util/transforms'
 
-const resultToTask = r => r
-  .map(Task.of)
-  .mapError(Task.rejected)
-  .merge()
+const validators = [
+  required('client_id'),
+  required('redirect_uri'),
+  required('response_type'),
+  required('state'),
+  oneOf(['code', 'token'], 'response_type')
+]
 
-const validate = p => {
-  return ['client_id', 'redirect_uri', 'response_type', 'state']
-    .reduce((acc, curr) => {
-      return p[curr]
-        ? acc.chain(() => Result.Ok(p))
-        : Result.Error(`${curr} is required`)
-    }, Result.Ok(p))
-}
+const buildAuthUrl = curry((base, params) => {
+  return reduce(concat, '', [base, '?', queryString.stringify(params)])
+})
 
 const authorize = curry((app, authorizeUrl, parameters) => {
-  return resultToTask(validate(parameters))
+  return resultToTask(validate(validators, parameters))
     .chain(() => random())
     .chain((rand) => set(app, 'state', rand))
-    .chain(() => redirect(authorizeUrl))
+    .chain(() => redirect(buildAuthUrl(authorizeUrl, parameters)))
 })
 
 export {

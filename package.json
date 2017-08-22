@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "folktale": "^2.0.1",
+    "query-string": "^5.0.0",
     "ramda": "^0.24.1",
     "superagent": "^3.6.0"
   },
