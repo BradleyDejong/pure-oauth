@@ -2,7 +2,7 @@
 
 import {task} from 'folktale/concurrency/task'
 const random = () => {
-  task(resolver => {
+  return task(resolver => {
     const arr = new Uint32Array(8)
     const c = crypto || msCrypto
     if (!c || !c.getRandomValues) {

@@ -2,7 +2,7 @@
   "name": "mayo-oauth",
   "version": "0.1.0",
   "description": "OAuth client for implicit flow",
-  "main": "index.js",
+  "main": "src/authorize.js",
   "scripts": {
     "test": "jest",
     "lint": "standard",

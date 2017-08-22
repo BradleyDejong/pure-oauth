@@ -19,10 +19,10 @@ const buildAuthUrl = curry((base, params) => {
   return reduce(concat, '', [base, '?', queryString.stringify(params)])
 })
 
-const authorize = curry((app, authorizeUrl, parameters) => {
+const authorize = curry((authorizeUrl, parameters) => {
   return resultToTask(validate(validators, parameters))
     .chain(() => random())
-    .chain((rand) => set(app, 'state', rand))
+    .chain((rand) => set(parameters.client_id, 'state', rand))
     .chain(() => redirect(buildAuthUrl(authorizeUrl, parameters)))
 })
 

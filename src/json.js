@@ -4,7 +4,7 @@ import Result from 'folktale/result'
 const fromJSON = json => {
   try {
     const val = JSON.parse(json)
-    return Result.Ok(val)
+    return Result.Ok(val || {})
   } catch (e) {
     return Result.Error(e)
   }
