@@ -1,4 +1,4 @@
-import {reduce, concat, curry, set as rset, lensProp, map, chain, compose} from 'ramda'
+import {reduce, concat, curry, set as rset, lensProp, map, chain, compose, __} from 'ramda'
 import queryString from 'query-string'
 
 import {set as sessionSet} from './session-store'
@@ -15,17 +15,18 @@ const validators = [
   anyOf(['code', 'token'], 'response_type')
 ]
 
-const buildAuthUrl = curry((base, params) => {
-  return reduce(concat, '', [base, '?', queryString.stringify(params)])
-})
+const buildAuthUrl = curry((base, params) => compose(
+  query => reduce(concat, '', [base, '?', query]),
+  queryString.stringify
+)(params))
 
 const authorize = curry((authorizeUrl, parameters) => {
   return compose(
     chain(redirect),
     map(buildAuthUrl(authorizeUrl)),
-    map(state => rset(lensProp('state'), state, parameters)),
+    map(rset(lensProp('state'), __, parameters)),
     chain(r => sessionSet(parameters.client_id, 'state', r)),
-    chain(() => random()),
+    chain(random),
     resultToTask,
     validate(validators)
   )(parameters)
