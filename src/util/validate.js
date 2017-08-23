@@ -7,6 +7,12 @@ const required = curry((name, obj) => {
     : Result.Error(`${name} is required`)
 })
 
+const eq = curry((expected, actual) => {
+  return expected === actual
+    ? Result.Ok(actual)
+    : Result.Error(`must be ${actual}`)
+})
+
 const anyOf = curry((values, name, obj) => {
   return reduce((acc, curr) => acc || obj[name] === curr, false, values)
     ? Result.Ok(obj)
@@ -17,4 +23,4 @@ const validate = curry((validators, obj) => {
   return traverse(Result.of, validator => validator(obj), validators)
 })
 
-export {required, anyOf, validate}
+export {required, eq, anyOf, validate}
