@@ -1,10 +1,11 @@
 /* eslint-env jest */
+/* global fail */
 
 jest.mock('./location')
 const location = require('./location')
 
 /* eslint-disable */
-import {validateState, currentCode, currentState} from './receive-access-code'
+import {getAccessCodeAndState, validateState, currentCode, currentState} from './receive-access-code'
 /* eslint-enable */
 
 describe('receive access code', () => {
@@ -24,32 +25,56 @@ describe('receive access code', () => {
     expect(result).toBe('mock-code')
   })
 
-  beforeEach(() => {
-    const store = {
-      mockApp: JSON.stringify({
-        state: 'valid-state'
+  describe('parse and validate', () => {
+    beforeEach(() => {
+      const store = {
+        mockApp: JSON.stringify({
+          state: 'valid-state'
+        })
+      }
+      global.sessionStorage = jest.fn()
+      global.sessionStorage.getItem = jest.fn((key) => {
+        return store[key]
       })
-    }
-    global.sessionStorage = jest.fn()
-    global.sessionStorage.getItem = jest.fn((key) => {
-      return store[key]
     })
-  })
 
-  it('validates equal state', () => {
-    location.__set('mock-location?state=valid-state')
-    return validateState('mockApp').run().promise()
-  })
+    it('validates equal state', () => {
+      location.__set('mock-location?state=valid-state')
+      return validateState('mockApp').run().promise()
+    })
 
-  it('invalidates non-equal state', async done => {
-    location.__set('mock-location?state=invalid-state')
-    await validateState('mockApp').run().promise()
-      .catch((e) => {
-        expect(e).toBe('must be valid-state')
-        done()
+    it('invalidates non-equal state', async done => {
+      location.__set('mock-location?state=invalid-state')
+      await validateState('mockApp').run().promise()
+        .then(() => {
+          fail('should fail to validate state')
+        })
+        .catch((e) => {
+          expect(e).toBe('State validation failed')
+          done()
+        })
+    })
+
+    it('returns object with code and state', async () => {
+      location.__set('mock-location?state=valid-state&code=wonderful-code')
+
+      const parsedValues = await getAccessCodeAndState('mockApp').run().promise()
+
+      expect(parsedValues).toEqual({
+        state: 'valid-state',
+        code: 'wonderful-code'
       })
-      .then(() => {
-        throw new Error('should not succeed')
-      })
+    })
+
+    it('fails if invalid state', async done => {
+      location.__set('mock-location?state=invalid-state&code=wonderful-code')
+
+      await getAccessCodeAndState('mockApp').run().promise()
+        .then(() => fail('Should reject due to invalid state'))
+        .catch(e => {
+          expect(e).toBe('State validation failed')
+          done()
+        })
+    })
   })
 })

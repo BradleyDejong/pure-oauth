@@ -1,4 +1,4 @@
-import {identity, compose, prop, map} from 'ramda'
+import {curry, identity, compose, prop, map} from 'ramda'
 import queryString from 'query-string'
 import url from 'url'
 import Task from 'folktale/concurrency/task'
@@ -23,12 +23,21 @@ const validateState = app => {
   return Task.of(eq)
     .ap(currentState)
     .ap(storedState(app, 'state'))
+    .map(result => result.mapError(() => 'State validation failed'))
     .map(resultToTask)
     .chain(identity)
 }
 
+const getAccessCodeAndState = app =>
+  validateState(app)
+  .chain(() => Task.of(curry((code, state) => ({code, state})))
+    .ap(currentCode)
+    .ap(currentState)
+  )
+
 export {
   currentState,
   currentCode,
-  validateState
+  validateState,
+  getAccessCodeAndState
 }
