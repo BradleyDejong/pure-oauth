@@ -1,5 +1,5 @@
 import request from 'superagent'
-import {curry} from 'ramda'
+import {curry, compose, prop} from 'ramda'
 import {task} from 'folktale/concurrency/task'
 
 const post = curry((url, params) => {
@@ -7,8 +7,10 @@ const post = curry((url, params) => {
     request.post(url)
       .type('form')
       .send(params)
-      .then(resolver.resolve)
-      .catch(resolver.reject)
+      .then(compose(resolver.resolve, prop('body')))
+      .catch(err => {
+        resolver.reject(err)
+      })
   })
 })
 

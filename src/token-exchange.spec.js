@@ -15,7 +15,15 @@ jest.mock('superagent', () => {
     send: jest.fn(function (args) {
       obj.__parameters = args
       return new Promise(function (resolve, reject) {
-        resolve('done')
+        resolve({
+          body: {
+            access_token: 'fake-token',
+            token_type: 'Bearer',
+            expires_in: 123,
+            scope: 'scope1 scope2 scope3',
+            refresh_token: 'fake-refresh-token'
+          }
+        })
       })
     })
   }
@@ -39,5 +47,33 @@ describe('token exchange', () => {
     })
 
     expect(superagent.__type).toBe('form')
+  })
+
+  test('response parsing', async () => {
+    const response = await exchangeToken('client-id', 'redirect-here', 'token-uri', 'abc123')
+      .run().promise()
+
+    expect(response).toEqual({
+      access_token: 'fake-token',
+      token_type: 'Bearer',
+      expires_in: 123,
+      scope: 'scope1 scope2 scope3',
+      refresh_token: 'fake-refresh-token'
+    })
+  })
+
+  test('passes through error to response', async () => {
+    superagent.send = jest.fn(function (args) {
+      return new Promise(function (resolve, reject) {
+        reject(new Error('test error!'))
+      })
+    })
+
+    try {
+      await exchangeToken('client-id', 'redirect-here', 'token-uri', 'abc123')
+        .run().promise()
+    } catch (e) {
+      expect(e.message).toBe('test error!')
+    }
   })
 })
