@@ -27,6 +27,13 @@ const go = (clientId, authUrl, redirectUri, responseType = 'code', tokenUri) => 
       }).run().promise()
     })
     .then(res => {
+      if (!res.code) {
+        return authorize(authUrl, {
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          response_type: responseType
+        }).run().promise()
+      }
       return exchangeToken(clientId, redirectUri, tokenUri, res.code).run().promise()
     })
     .then(token => {
