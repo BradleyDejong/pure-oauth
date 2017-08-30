@@ -11,7 +11,6 @@ const validators = [
   required('client_id'),
   required('redirect_uri'),
   required('response_type'),
-  required('state'),
   anyOf(['code', 'token'], 'response_type')
 ]
 
